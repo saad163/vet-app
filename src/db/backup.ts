@@ -1,7 +1,9 @@
 import { File, Paths } from 'expo-file-system';
+import * as LegacyFileSystem from 'expo-file-system/legacy';
+const { StorageAccessFramework } = LegacyFileSystem;
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import * as SQLite from 'expo-sqlite';
 import { getDB, resetDB, initDatabase } from '../../database';
 
@@ -10,30 +12,57 @@ const DB_NAME = 'vetstore.db';
 export const exportDatabase = async () => {
   try {
     const db = getDB();
-    // Serialize merges WAL internally into a single block of bytes cleanly.
     const serializedData = await db.serializeAsync();
-
     const date = new Date().toISOString().split('T')[0];
-    const backupFile = new File(Paths.cache, `New-Malik-Veterinary-Backup-${date}.sqlite`);
-
+    const fileName = `New_Malik_Veterinary_Backup_${date}.sqlite`;
+    
+    // Write to a temporary cache file first to easily extract Base64
+    const backupFile = new File(Paths.cache, fileName);
     if (backupFile.exists) {
       backupFile.delete();
     }
-    
-    // Write the raw bytes to the .sqlite file
     backupFile.create();
     backupFile.write(serializedData);
 
-    const canShare = await Sharing.isAvailableAsync();
-    if (!canShare) {
-      Alert.alert('Error', 'Sharing is not available on this device.');
-      return;
-    }
+    if (Platform.OS === 'android') {
+      const permissions = await StorageAccessFramework.requestDirectoryPermissionsAsync();
+      
+      if (!permissions.granted) {
+        Alert.alert('Permission Denied', 'Please select a folder to save your backup.');
+        return;
+      }
+      
+      // Read the cache file as Base64
+      const base64Data = await LegacyFileSystem.readAsStringAsync(backupFile.uri, {
+        encoding: LegacyFileSystem.EncodingType.Base64,
+      });
 
-    await Sharing.shareAsync(backupFile.uri, {
-      mimeType: 'application/x-sqlite3',
-      dialogTitle: 'Export Vet Store Database',
-    });
+      // Create file in the selected directory (e.g., Downloads)
+      const newFileUri = await StorageAccessFramework.createFileAsync(
+        permissions.directoryUri,
+        fileName,
+        'application/x-sqlite3'
+      );
+
+      // Write the Base64 data to the new file
+      await StorageAccessFramework.writeAsStringAsync(newFileUri, base64Data, {
+        encoding: LegacyFileSystem.EncodingType.Base64,
+      });
+
+      Alert.alert('Success', `Database backup saved successfully to the selected folder!`);
+    } else {
+      // Fallback for iOS
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        Alert.alert('Error', 'Sharing is not available on this device.');
+        return;
+      }
+      await Sharing.shareAsync(backupFile.uri, {
+        mimeType: 'application/x-sqlite3',
+        dialogTitle: 'Export Vet Store Database',
+      });
+      Alert.alert('Success', 'Database backup exported.');
+    }
   } catch (error) {
     console.error('Error exporting database:', error);
     Alert.alert('Error', 'Failed to export database.');

@@ -4,6 +4,8 @@ import { useFocusEffect } from "expo-router";
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { Paths, File } from 'expo-file-system';
+import * as LegacyFileSystem from 'expo-file-system/legacy';
+const { StorageAccessFramework } = LegacyFileSystem;
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { Platform } from 'react-native';
 import { getDailyReport, getMonthlyReport, DailyReport, MonthlyReport } from "../../src/db/reports";
@@ -11,6 +13,7 @@ import { getPDFReportData } from "../../src/db/pdf";
 import { generatePDFHtml } from "../../src/utils/pdf-template";
 
 export default function DailyMonthlyReports() {
+  const [isExporting, setIsExporting] = useState(false);
   const [tab, setTab] = useState<'daily' | 'monthly' | 'export'>('daily');
   const [dailyData, setDailyData] = useState<DailyReport[]>([]);
   const [monthlyData, setMonthlyData] = useState<MonthlyReport[]>([]);
@@ -96,7 +99,9 @@ export default function DailyMonthlyReports() {
   );
 
   const handleDownloadPDF = async () => {
+    if (isExporting) return;
     try {
+      setIsExporting(true);
       let startDate = '';
       let endDate = '';
       let reportName = '';
@@ -144,32 +149,50 @@ export default function DailyMonthlyReports() {
       
       const safeReportName = reportName.replace(/[^a-zA-Z0-9-]/g, '-').replace(/-+/g, '-');
       
-      const destFile = new File(Paths.document, `New-Malik-Veterinary-${safeReportName}.pdf`);
-      
-      if (destFile.exists) {
-        await destFile.delete(); // ensure it gets overwritten
+      if (!base64) {
+        Alert.alert("Error", "Failed to generate PDF content.");
+        return;
       }
 
-      if (base64) {
+      if (Platform.OS === 'android') {
+        const permissions = await StorageAccessFramework.requestDirectoryPermissionsAsync();
+        
+        if (!permissions.granted) {
+          Alert.alert('Permission Denied', 'Please select a folder to save your PDF report.');
+          return;
+        }
+
+        const newFileUri = await StorageAccessFramework.createFileAsync(
+          permissions.directoryUri,
+          `New_Malik_Veterinary_${safeReportName}.pdf`,
+          'application/pdf'
+        );
+
+        await StorageAccessFramework.writeAsStringAsync(newFileUri, base64, {
+          encoding: LegacyFileSystem.EncodingType.Base64,
+        });
+
+        Alert.alert('Success', `PDF report saved successfully to the selected folder!`);
+      } else {
+        // Fallback for iOS
+        const destFile = new File(Paths.document, `New-Malik-Veterinary-${safeReportName}.pdf`);
+        if (destFile.exists) {
+          await destFile.delete();
+        }
         destFile.write(base64, { encoding: 'base64' });
+
+        const canShare = await Sharing.isAvailableAsync();
+        if (!canShare) {
+          Alert.alert("Error", "Sharing is not available on this device.");
+          return;
+        }
+        await Sharing.shareAsync(destFile.uri, { UTI: '.pdf', mimeType: 'application/pdf', dialogTitle: 'Download PDF Report' });
       }
-
-      if (!destFile.exists) {
-        Alert.alert("Error", "PDF file was not created successfully.");
-        return;
-      }
-
-      const canShare = await Sharing.isAvailableAsync();
-      if (!canShare) {
-        Alert.alert("Error", "Sharing is not available on this device.");
-        return;
-      }
-
-      await Sharing.shareAsync(destFile.uri, { UTI: '.pdf', mimeType: 'application/pdf', dialogTitle: 'Download PDF Report' });
-
     } catch (e) {
       Alert.alert("Error", "Failed to generate PDF report.");
       console.error(e);
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -347,10 +370,11 @@ export default function DailyMonthlyReports() {
           )}
 
           <TouchableOpacity 
-            className="bg-primary-600 p-4 rounded-xl items-center mt-4"
+            className={`p-4 rounded-xl items-center mt-4 flex-row justify-center ${isExporting ? 'bg-primary-400' : 'bg-primary-600'}`}
             onPress={handleDownloadPDF}
+            disabled={isExporting}
           >
-            <Text className="text-white font-bold text-lg">Generate & Download PDF</Text>
+            {isExporting ? <Text className="text-white font-bold text-lg mr-2">Generating...</Text> : <Text className="text-white font-bold text-lg">Generate & Download PDF</Text>}
           </TouchableOpacity>
         </ScrollView>
       )}

@@ -57,6 +57,7 @@ npx expo start -c
 
 To install the production-ready app on any Android device:
 1. Download the generated `.apk` file to your Android phone.
+   *(Note: The latest APK was successfully compiled and finalized on **September 23, 2026 at 12:44 AM**)*
 2. Tap the downloaded APK file to open it.
 3. If Android prompts you with a security warning, click **Settings** and enable **"Allow installation from unknown sources"**.
 4. Click **Install**.

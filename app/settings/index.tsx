@@ -1,15 +1,25 @@
-import { View, Text, TouchableOpacity, ScrollView } from "react-native";
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
+import { useState } from "react";
 import { Link } from "expo-router";
 import { exportDatabase, importDatabase } from "../../src/db/backup";
 import { DownloadCloud, UploadCloud, FileText, PieChart } from "lucide-react-native";
 
 export default function SettingsIndex() {
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+
   const handleExport = async () => {
+    if (isExporting || isImporting) return;
+    setIsExporting(true);
     await exportDatabase();
+    setIsExporting(false);
   };
 
   const handleImport = async () => {
+    if (isExporting || isImporting) return;
+    setIsImporting(true);
     await importDatabase();
+    setIsImporting(false);
   };
 
   return (
@@ -48,19 +58,33 @@ export default function SettingsIndex() {
         </Text>
 
         <TouchableOpacity 
-          className="bg-primary-600 p-4 rounded-xl items-center flex-row justify-center mb-4"
+          className={`p-4 rounded-xl items-center flex-row justify-center mb-4 ${isExporting ? 'bg-primary-400' : 'bg-primary-600'}`}
           onPress={handleExport}
+          disabled={isExporting || isImporting}
         >
-          <DownloadCloud color="white" size={20} />
-          <Text className="text-white font-bold ml-2 text-lg">Export Backup (.db)</Text>
+          {isExporting ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <DownloadCloud color="white" size={20} />
+          )}
+          <Text className="text-white font-bold ml-2 text-lg">
+            {isExporting ? 'Exporting...' : 'Export Backup (.db)'}
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity 
-          className="bg-gray-100 border border-gray-300 p-4 rounded-xl items-center flex-row justify-center"
+          className={`border border-gray-300 p-4 rounded-xl items-center flex-row justify-center ${isImporting ? 'bg-gray-200' : 'bg-gray-100'}`}
           onPress={handleImport}
+          disabled={isExporting || isImporting}
         >
-          <UploadCloud color="#374151" size={20} />
-          <Text className="text-gray-800 font-bold ml-2 text-lg">Import Backup (.db)</Text>
+          {isImporting ? (
+            <ActivityIndicator color="#374151" />
+          ) : (
+            <UploadCloud color="#374151" size={20} />
+          )}
+          <Text className="text-gray-800 font-bold ml-2 text-lg">
+            {isImporting ? 'Importing...' : 'Import Backup (.db)'}
+          </Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
