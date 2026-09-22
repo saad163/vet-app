@@ -40,7 +40,7 @@ export default function NewPurchase() {
   };
 
   const handleAddItem = () => {
-    if (!currentItem.product_id || !currentItem.batch_number || !currentItem.quantity || !currentItem.purchase_price) {
+    if (!currentItem.product_id || !currentItem.quantity || !currentItem.purchase_price) {
       Alert.alert("Error", "Please fill all required item fields.");
       return;
     }
@@ -80,7 +80,7 @@ export default function NewPurchase() {
                 <X color="red" size={20} />
               </TouchableOpacity>
             </View>
-            <Text className="text-gray-600">Batch: {item.batch_number} | Qty: {item.quantity}</Text>
+            <Text className="text-gray-600">Qty: {item.quantity}</Text>
             <Text className="text-gray-600">Price: Rs. {item.purchase_price} (Subtotal: Rs. {item.purchase_price * item.quantity})</Text>
           </View>
         ))}
@@ -99,13 +99,7 @@ export default function NewPurchase() {
 
           <View className="flex-row justify-between">
             <TextInput
-              className="bg-white border border-gray-200 rounded-lg p-3 mb-4 w-[48%]"
-              placeholder="Batch No. *"
-              value={currentItem.batch_number || ""}
-              onChangeText={(t) => setCurrentItem({...currentItem, batch_number: t})}
-            />
-            <TextInput
-              className="bg-white border border-gray-200 rounded-lg p-3 mb-4 w-[48%]"
+              className="bg-white border border-gray-200 rounded-lg p-3 mb-4 w-[100%]"
               placeholder="Expiry (YYYY-MM-DD)"
               value={currentItem.expiry_date || ""}
               onChangeText={(t) => setCurrentItem({...currentItem, expiry_date: t})}

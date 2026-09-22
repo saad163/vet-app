@@ -1,7 +1,6 @@
 import { getDB } from "../../database";
 import { getProductById } from "./products";
-import { getBatchesForProduct } from "./purchases";
-import { Sale } from "../types"; // I'll add this type later or just use inline
+import { Sale, SaleItem } from "../types";
 
 export interface NewSaleItemInput {
   product_id: number;
@@ -53,50 +52,37 @@ export const createSale = (
     
     saleId = saleResult.lastInsertRowId;
 
-    // 3. Process FIFO and Insert Sale Items
+    // 3. Process Items directly against Product
     for (const item of items) {
-      let quantityToFulfill = item.quantity;
-      const batches = getBatchesForProduct(item.product_id); // Ordered by purchase_date ASC
-
-      for (const batch of batches) {
-        if (quantityToFulfill <= 0) break;
-
-        const quantityFromBatch = Math.min(batch.remaining_quantity, quantityToFulfill);
-        const profitPerUnit = item.selling_price - batch.purchase_price;
-        const totalProfitForBatch = profitPerUnit * quantityFromBatch;
-        const subtotal = item.selling_price * quantityFromBatch;
-
-        // Deduct from batch
-        db.runSync(`
-          UPDATE batches 
-          SET remaining_quantity = remaining_quantity - ? 
-          WHERE id = ?
-        `, [quantityFromBatch, batch.id]);
-
-        // Create sale item
-        db.runSync(`
-          INSERT INTO sale_items (sale_id, product_id, batch_id, quantity, purchase_price, selling_price, profit_per_unit, total_profit, subtotal)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `, [
-          saleId,
-          item.product_id,
-          batch.id,
-          quantityFromBatch,
-          batch.purchase_price,
-          item.selling_price,
-          profitPerUnit,
-          totalProfitForBatch,
-          subtotal
-        ]);
-
-        total_profit += totalProfitForBatch;
-        quantityToFulfill -= quantityFromBatch;
-      }
+      const product = getProductById(item.product_id)!;
       
-      // We already checked total_stock, so quantityToFulfill should always reach 0.
-      if (quantityToFulfill > 0) {
-        throw new Error(`Critical Inventory Error: Could not fulfill ${quantityToFulfill} units of product ID ${item.product_id} from batches.`);
-      }
+      const profitPerUnit = item.selling_price - product.purchase_price;
+      const totalProfitForItem = profitPerUnit * item.quantity;
+      const subtotal = item.selling_price * item.quantity;
+
+      // Deduct from product stock
+      db.runSync(`
+        UPDATE products 
+        SET total_stock = total_stock - ? 
+        WHERE id = ?
+      `, [item.quantity, item.product_id]);
+
+      // Create sale item
+      db.runSync(`
+        INSERT INTO sale_items (sale_id, product_id, quantity, purchase_price, selling_price, profit_per_unit, total_profit, subtotal)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        saleId,
+        item.product_id,
+        item.quantity,
+        product.purchase_price,
+        item.selling_price,
+        profitPerUnit,
+        totalProfitForItem,
+        subtotal
+      ]);
+
+      total_profit += totalProfitForItem;
     }
 
     // 4. Update the Sale record with the calculated total profit
@@ -111,6 +97,57 @@ export const createSale = (
 export const getSales = () => {
   const db = getDB();
   return db.getAllSync(`
-    SELECT * FROM sales ORDER BY sale_date DESC
+    SELECT s.*, c.name as customer_name 
+    FROM sales s
+    LEFT JOIN customers c ON s.customer_id = c.id
+    ORDER BY s.sale_date DESC
   `);
+};
+
+export interface SaleDetailItem {
+  id: number;
+  sale_id: number;
+  product_id: number;
+  quantity: number;
+  purchase_price: number;
+  selling_price: number;
+  profit_per_unit: number;
+  total_profit: number;
+  subtotal: number;
+  product_name: string;
+  returned_quantity: number; // dynamically calculated
+}
+
+export interface SaleDetails extends Sale {
+  customer_name: string | null;
+  items: SaleDetailItem[];
+}
+
+export const getSaleDetails = (saleId: number): SaleDetails | null => {
+  const db = getDB();
+  const sale = db.getFirstSync<any>(`
+    SELECT s.*, c.name as customer_name 
+    FROM sales s
+    LEFT JOIN customers c ON s.customer_id = c.id
+    WHERE s.id = ?
+  `, [saleId]);
+
+  if (!sale) return null;
+
+  const items = db.getAllSync<any>(`
+    SELECT 
+      si.*, 
+      p.name as product_name,
+      COALESCE(SUM(ri.quantity), 0) as returned_quantity
+    FROM sale_items si
+    JOIN products p ON si.product_id = p.id
+    LEFT JOIN return_items ri ON ri.sale_item_id = si.id
+    WHERE si.sale_id = ?
+    GROUP BY si.id
+  `, [saleId]);
+
+  return {
+    ...sale,
+    items
+  };
 };

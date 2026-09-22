@@ -7,14 +7,14 @@ export interface DashboardMetrics {
   todayProfit: number;
   lowStockCount: number;
   outOfStockCount: number;
-  expiringSoonCount: number;
+  nearExpiryCount: number;
+  expiredCount: number;
 }
 
 export const getDashboardMetrics = (): DashboardMetrics => {
   const db = getDB();
-  const today = new Date().toISOString().split("T")[0] + "%"; // match '2026-09-16' part
+  const today = new Date().toISOString().split("T")[0] + "%"; 
   
-  // Date 30 days from now
   const thirtyDaysFromNow = new Date();
   thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
   const expiryThreshold = thirtyDaysFromNow.toISOString().split("T")[0];
@@ -26,7 +26,8 @@ export const getDashboardMetrics = (): DashboardMetrics => {
     todayProfit: 0,
     lowStockCount: 0,
     outOfStockCount: 0,
-    expiringSoonCount: 0,
+    nearExpiryCount: 0,
+    expiredCount: 0,
   };
 
   // 1. Total active products
@@ -34,25 +35,30 @@ export const getDashboardMetrics = (): DashboardMetrics => {
   metrics.totalProducts = productsResult?.count || 0;
 
   // 2. Total Stock
-  const stockResult = db.getFirstSync<{total: number}>(`SELECT SUM(remaining_quantity) as total FROM batches`);
+  const stockResult = db.getFirstSync<{total: number}>(`SELECT SUM(total_stock) as total FROM products WHERE is_active = 1`);
   metrics.totalStock = stockResult?.total || 0;
 
   // 3. Today's Sales & Profit
   const salesResult = db.getFirstSync<{sales: number, profit: number}>(`
-    SELECT SUM(total_amount) as sales, SUM(total_profit) as profit 
+    SELECT COALESCE(SUM(total_amount), 0) as sales, COALESCE(SUM(total_profit), 0) as profit 
     FROM sales 
     WHERE sale_date LIKE ?
   `, [today]);
-  metrics.todaySales = salesResult?.sales || 0;
-  metrics.todayProfit = salesResult?.profit || 0;
+  
+  const returnsResult = db.getFirstSync<{returns: number, return_profit: number}>(`
+    SELECT COALESCE(SUM(total_refund), 0) as returns, COALESCE(SUM(total_profit_adjustment), 0) as return_profit 
+    FROM returns 
+    WHERE return_date LIKE ?
+  `, [today]);
 
-  // 4. Alerts counts (needs to aggregate batch stock by product)
+  metrics.todaySales = (salesResult?.sales || 0) - (returnsResult?.returns || 0);
+  metrics.todayProfit = (salesResult?.profit || 0) - (returnsResult?.return_profit || 0);
+
+  // 4. Alerts counts
   const productStock = db.getAllSync<{id: number, min_alert: number, total: number}>(`
-    SELECT p.id, p.min_stock_alert as min_alert, COALESCE(SUM(b.remaining_quantity), 0) as total
-    FROM products p
-    LEFT JOIN batches b ON p.id = b.product_id
-    WHERE p.is_active = 1
-    GROUP BY p.id
+    SELECT id, min_stock_alert as min_alert, total_stock as total
+    FROM products
+    WHERE is_active = 1
   `);
 
   for (const p of productStock) {
@@ -63,23 +69,38 @@ export const getDashboardMetrics = (): DashboardMetrics => {
     }
   }
 
-  // 5. Expiring soon count
+  // 5. Expiring soon & Expired counts
+  const todayDateStr = new Date().toISOString().split("T")[0];
+  
   const expiringResult = db.getFirstSync<{count: number}>(`
-    SELECT COUNT(id) as count FROM batches 
-    WHERE remaining_quantity > 0 
+    SELECT COUNT(id) as count FROM products 
+    WHERE total_stock > 0 
+    AND expiry_date IS NOT NULL 
+    AND expiry_date != '' 
+    AND expiry_date > ? 
+    AND expiry_date <= ?
+    AND is_active = 1
+  `, [todayDateStr, expiryThreshold]);
+  
+  const expiredResult = db.getFirstSync<{count: number}>(`
+    SELECT COUNT(id) as count FROM products 
+    WHERE total_stock > 0 
     AND expiry_date IS NOT NULL 
     AND expiry_date != '' 
     AND expiry_date <= ?
-  `, [expiryThreshold]);
+    AND is_active = 1
+  `, [todayDateStr]);
   
-  metrics.expiringSoonCount = expiringResult?.count || 0;
+  metrics.nearExpiryCount = expiringResult?.count || 0;
+  metrics.expiredCount = expiredResult?.count || 0;
 
   return metrics;
 };
 
 export interface AlertItem {
   id: string; // unique string for UI
-  type: 'OUT_OF_STOCK' | 'LOW_STOCK' | 'EXPIRING';
+  type: 'OUT_OF_STOCK' | 'LOW_STOCK' | 'NEAR_EXPIRY' | 'EXPIRED';
+  productId: number;
   productName: string;
   message: string;
 }
@@ -90,12 +111,10 @@ export const getAlerts = (): AlertItem[] => {
 
   // Low/Out of Stock
   const productStock = db.getAllSync<{id: number, name: string, min_alert: number, total: number}>(`
-    SELECT p.id, p.name, p.min_stock_alert as min_alert, COALESCE(SUM(b.remaining_quantity), 0) as total
-    FROM products p
-    LEFT JOIN batches b ON p.id = b.product_id
-    WHERE p.is_active = 1
-    GROUP BY p.id
-    HAVING total <= min_alert OR total = 0
+    SELECT id, name, min_stock_alert as min_alert, total_stock as total
+    FROM products
+    WHERE is_active = 1
+    AND (total_stock <= min_stock_alert OR total_stock = 0)
   `);
 
   for (const p of productStock) {
@@ -103,6 +122,7 @@ export const getAlerts = (): AlertItem[] => {
       alerts.push({
         id: `oos-${p.id}`,
         type: 'OUT_OF_STOCK',
+        productId: p.id,
         productName: p.name,
         message: 'Out of stock'
       });
@@ -110,6 +130,7 @@ export const getAlerts = (): AlertItem[] => {
       alerts.push({
         id: `low-${p.id}`,
         type: 'LOW_STOCK',
+        productId: p.id,
         productName: p.name,
         message: `Only ${p.total} units remaining (Min: ${p.min_alert})`
       });
@@ -121,22 +142,28 @@ export const getAlerts = (): AlertItem[] => {
   thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
   const expiryThreshold = thirtyDaysFromNow.toISOString().split("T")[0];
 
-  const expiringBatches = db.getAllSync<{id: number, product_name: string, batch_number: string, expiry_date: string}>(`
-    SELECT b.id, p.name as product_name, b.batch_number, b.expiry_date
-    FROM batches b
-    JOIN products p ON b.product_id = p.id
-    WHERE b.remaining_quantity > 0 
-    AND b.expiry_date IS NOT NULL 
-    AND b.expiry_date != '' 
-    AND b.expiry_date <= ?
+  const todayDateStr = new Date().toISOString().split("T")[0];
+
+  const expiringProducts = db.getAllSync<{id: number, name: string, expiry_date: string}>(`
+    SELECT id, name, expiry_date
+    FROM products
+    WHERE total_stock > 0 
+    AND expiry_date IS NOT NULL 
+    AND expiry_date != '' 
+    AND expiry_date <= ?
+    AND is_active = 1
   `, [expiryThreshold]);
 
-  for (const b of expiringBatches) {
+  for (const p of expiringProducts) {
+    const isExpired = p.expiry_date <= todayDateStr;
     alerts.push({
-      id: `exp-${b.id}`,
-      type: 'EXPIRING',
-      productName: b.product_name,
-      message: `Batch ${b.batch_number} expires on ${b.expiry_date}`
+      id: isExpired ? `expired-${p.id}` : `exp-${p.id}`,
+      type: isExpired ? 'EXPIRED' : 'NEAR_EXPIRY',
+      productId: p.id,
+      productName: p.name,
+      message: isExpired 
+        ? `Expired on ${p.expiry_date}` 
+        : `Expires on ${p.expiry_date}`
     });
   }
 

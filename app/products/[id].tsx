@@ -1,7 +1,7 @@
 import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert } from "react-native";
 import { useState, useEffect } from "react";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { getProductById, updateProduct } from "../../src/db/products";
+import { getProductById, updateProduct, deactivateProduct } from "../../src/db/products";
 
 export default function EditProduct() {
   const { id } = useLocalSearchParams();
@@ -68,6 +68,28 @@ export default function EditProduct() {
       Alert.alert("Error", "Failed to update product.");
       console.error(e);
     }
+  };
+
+  const handleDelete = () => {
+    Alert.alert(
+      "Deactivate Product",
+      "Are you sure you want to remove this product? It will be hidden from the list but historical sales will be preserved.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Deactivate", 
+          style: "destructive",
+          onPress: () => {
+            try {
+              deactivateProduct(Number(id));
+              router.back();
+            } catch (e) {
+              Alert.alert("Error", "Failed to deactivate product.");
+            }
+          }
+        }
+      ]
+    );
   };
 
   return (
@@ -154,10 +176,17 @@ export default function EditProduct() {
       />
 
       <TouchableOpacity
-        className="bg-primary-600 p-4 rounded-xl items-center mb-10"
+        className="bg-primary-600 p-4 rounded-xl items-center mb-4"
         onPress={handleSave}
       >
         <Text className="text-white font-bold text-lg">Update Product</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        className="bg-red-50 p-4 rounded-xl items-center mb-10 border border-red-200"
+        onPress={handleDelete}
+      >
+        <Text className="text-red-600 font-bold text-lg">Deactivate / Delete Product</Text>
       </TouchableOpacity>
     </ScrollView>
   );

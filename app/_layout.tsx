@@ -22,6 +22,13 @@ export default function Layout() {
   return (
     <Stack>
       <Stack.Screen name="index" options={{ title: "Dashboard" }} />
+      <Stack.Screen name="products" options={{ headerShown: false }} />
+      <Stack.Screen name="sales" options={{ headerShown: false }} />
+      <Stack.Screen name="purchases" options={{ headerShown: false }} />
+      <Stack.Screen name="reports" options={{ headerShown: false }} />
+      <Stack.Screen name="customers" options={{ headerShown: false }} />
+      <Stack.Screen name="settings" options={{ headerShown: false }} />
+      <Stack.Screen name="returns" options={{ headerShown: false }} />
     </Stack>
   );
 }

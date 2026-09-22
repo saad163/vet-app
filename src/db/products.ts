@@ -1,48 +1,45 @@
 import { getDB } from "../../database";
-import { Product, ProductWithStock } from "../types";
+import { Product } from "../types";
 
-export const getProducts = (): ProductWithStock[] => {
+export const getProducts = (): Product[] => {
   const db = getDB();
   return db.getAllSync(`
-    SELECT p.*, COALESCE(SUM(b.remaining_quantity), 0) as total_stock
-    FROM products p
-    LEFT JOIN batches b ON p.id = b.product_id
-    WHERE p.is_active = 1
-    GROUP BY p.id
-    ORDER BY p.name ASC
+    SELECT *
+    FROM products
+    WHERE is_active = 1
+    ORDER BY name ASC
   `);
 };
 
-export const searchProducts = (query: string): ProductWithStock[] => {
+export const searchProducts = (query: string): Product[] => {
   const db = getDB();
   return db.getAllSync(`
-    SELECT p.*, COALESCE(SUM(b.remaining_quantity), 0) as total_stock
-    FROM products p
-    LEFT JOIN batches b ON p.id = b.product_id
-    WHERE p.is_active = 1 AND (p.name LIKE ? OR p.brand LIKE ? OR p.category LIKE ?)
-    GROUP BY p.id
-    ORDER BY p.name ASC
+    SELECT *
+    FROM products
+    WHERE is_active = 1 AND (name LIKE ? OR brand LIKE ? OR category LIKE ?)
+    ORDER BY name ASC
   `, [`%${query}%`, `%${query}%`, `%${query}%`]);
 };
 
-export const getProductById = (id: number): ProductWithStock | null => {
+export const getProductById = (id: number): Product | null => {
   const db = getDB();
-  return db.getFirstSync<ProductWithStock>(`
-    SELECT p.*, COALESCE(SUM(b.remaining_quantity), 0) as total_stock
-    FROM products p
-    LEFT JOIN batches b ON p.id = b.product_id
-    WHERE p.id = ?
-    GROUP BY p.id
+  return db.getFirstSync<Product>(`
+    SELECT *
+    FROM products
+    WHERE id = ?
   `, [id]);
 };
 
 export const addProduct = (
-  product: Omit<Product, "id" | "created_at" | "updated_at" | "is_active">
+  product: Omit<Product, "id" | "created_at" | "updated_at" | "is_active" | "total_stock" | "purchase_price" | "expiry_date">,
+  purchase_price: number,
+  initial_quantity: number,
+  expiry_date: string | null = null
 ): number => {
   const db = getDB();
   const result = db.runSync(`
-    INSERT INTO products (name, category, brand, description, unit, min_selling_price, max_selling_price, min_stock_alert)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO products (name, category, brand, description, unit, min_selling_price, max_selling_price, min_stock_alert, total_stock, purchase_price, expiry_date)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     product.name,
     product.category,
@@ -52,30 +49,32 @@ export const addProduct = (
     product.min_selling_price,
     product.max_selling_price,
     product.min_stock_alert,
+    initial_quantity,
+    purchase_price,
+    expiry_date
   ]);
+  
   return result.lastInsertRowId;
 };
 
 export const updateProduct = (
   id: number,
-  product: Omit<Product, "id" | "created_at" | "updated_at" | "is_active">
+  product: Partial<Omit<Product, "id" | "created_at" | "updated_at" | "is_active">>
 ): void => {
   const db = getDB();
+  
+  // Build dynamic update query
+  const keys = Object.keys(product);
+  if (keys.length === 0) return;
+  
+  const setString = keys.map(k => `${k} = ?`).join(", ");
+  const values = Object.values(product);
+  
   db.runSync(`
     UPDATE products
-    SET name = ?, category = ?, brand = ?, description = ?, unit = ?, min_selling_price = ?, max_selling_price = ?, min_stock_alert = ?, updated_at = CURRENT_TIMESTAMP
+    SET ${setString}, updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
-  `, [
-    product.name,
-    product.category,
-    product.brand,
-    product.description,
-    product.unit,
-    product.min_selling_price,
-    product.max_selling_price,
-    product.min_stock_alert,
-    id,
-  ]);
+  `, [...values, id]);
 };
 
 export const deactivateProduct = (id: number): void => {

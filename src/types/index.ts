@@ -8,26 +8,16 @@ export interface Product {
   min_selling_price: number;
   max_selling_price: number;
   min_stock_alert: number;
+  total_stock: number;
+  purchase_price: number;
+  expiry_date: string | null;
   is_active: number;
   created_at: string;
   updated_at: string;
 }
 
 export interface ProductWithStock extends Product {
-  total_stock: number;
-}
-
-export interface Batch {
-  id: number;
-  product_id: number;
-  batch_number: string;
-  purchase_price: number;
-  quantity_purchased: number;
-  remaining_quantity: number;
-  expiry_date: string | null;
-  purchase_date: string;
-  supplier: string | null;
-  created_at: string;
+  // Alias for backward compatibility if needed, but it's identical now.
 }
 
 export interface Purchase {
@@ -43,10 +33,10 @@ export interface PurchaseItem {
   id: number;
   purchase_id: number;
   product_id: number;
-  batch_id: number;
   quantity: number;
   purchase_price: number;
   subtotal: number;
+  expiry_date: string | null;
 }
 
 export interface Sale {
@@ -55,6 +45,9 @@ export interface Sale {
   sale_date: string;
   total_amount: number;
   total_profit: number;
+  returned_amount: number;
+  returned_profit: number;
+  status: string;
   notes: string | null;
   created_at: string;
 }
@@ -63,13 +56,33 @@ export interface SaleItem {
   id: number;
   sale_id: number;
   product_id: number;
-  batch_id: number;
   quantity: number;
   purchase_price: number;
   selling_price: number;
   profit_per_unit: number;
   total_profit: number;
   subtotal: number;
+}
+
+export interface Return {
+  id: number;
+  sale_id: number;
+  return_date: string;
+  total_refund: number;
+  total_profit_adjustment: number;
+  reason: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface ReturnItem {
+  id: number;
+  return_id: number;
+  sale_item_id: number;
+  product_id: number;
+  quantity: number;
+  refund_amount: number;
+  profit_adjustment: number;
 }
 
 export interface Customer {

@@ -39,3 +39,12 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Security & Backups
+*.sqlite
+*.sqlite3
+*.db
+*.apk
+*.aab
+.env
+.env.*

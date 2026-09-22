@@ -21,20 +21,34 @@ export default function SalesList() {
         data={sales}
         keyExtractor={(item) => item.id.toString()}
         renderItem={({ item }) => (
-          <TouchableOpacity className="bg-white p-4 rounded-xl shadow-sm mb-3">
-            <View className="flex-row justify-between items-start">
-              <View>
-                <Text className="text-lg font-bold text-gray-800">
-                  {format(new Date(item.sale_date), "dd MMM yyyy HH:mm")}
-                </Text>
-                <Text className="text-gray-500">ID: #{item.id}</Text>
+          <Link href={`/sales/${item.id}`} asChild>
+            <TouchableOpacity className="bg-white p-4 rounded-xl shadow-sm mb-3">
+              <View className="flex-row justify-between items-start">
+                <View>
+                  <Text className="text-lg font-bold text-gray-800">
+                    {format(new Date(item.sale_date), "dd MMM yyyy HH:mm")}
+                  </Text>
+                  <Text className="text-gray-500">ID: #{item.id}</Text>
+                  {item.status && item.status !== 'COMPLETED' && (
+                    <View className="mt-1 bg-amber-100 self-start px-2 py-1 rounded-md">
+                      <Text className="text-amber-800 text-xs font-bold">
+                        {item.status.replace('_', ' ')}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                <View className="items-end">
+                  <Text className="text-lg font-bold text-primary-700">Rs. {item.total_amount}</Text>
+                  <Text className="text-green-600 font-medium text-sm">Profit: Rs. {item.total_profit}</Text>
+                  {(item.returned_amount || 0) > 0 && (
+                    <Text className="text-red-600 font-medium text-xs mt-1">
+                      Returned: Rs. {item.returned_amount}
+                    </Text>
+                  )}
+                </View>
               </View>
-              <View className="items-end">
-                <Text className="text-lg font-bold text-primary-700">Rs. {item.total_amount}</Text>
-                <Text className="text-green-600 font-medium text-sm">Profit: Rs. {item.total_profit}</Text>
-              </View>
-            </View>
-          </TouchableOpacity>
+            </TouchableOpacity>
+          </Link>
         )}
         ListEmptyComponent={() => (
           <View className="items-center justify-center py-10">

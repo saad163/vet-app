@@ -1,9 +1,8 @@
 import { getDB } from "../../database";
-import { Batch, Purchase, PurchaseItem } from "../types";
+import { Purchase, PurchaseItem } from "../types";
 
 export interface NewPurchaseItem {
   product_id: number;
-  batch_number: string;
   purchase_price: number;
   quantity: number;
   expiry_date: string | null;
@@ -32,35 +31,39 @@ export const createPurchase = (
 
     // 3. Process each item
     for (const item of items) {
-      // a. Insert Batch
-      const batchResult = db.runSync(`
-        INSERT INTO batches (product_id, batch_number, purchase_price, quantity_purchased, remaining_quantity, expiry_date, purchase_date, supplier)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `, [
-        item.product_id,
-        item.batch_number,
-        item.purchase_price,
-        item.quantity,
-        item.quantity, // remaining is initially full quantity
-        item.expiry_date,
-        purchase_date,
-        supplier
-      ]);
-      const batchId = batchResult.lastInsertRowId;
-
-      // b. Insert Purchase Item
+      // a. Insert Purchase Item
       const subtotal = item.purchase_price * item.quantity;
       db.runSync(`
-        INSERT INTO purchase_items (purchase_id, product_id, batch_id, quantity, purchase_price, subtotal)
+        INSERT INTO purchase_items (purchase_id, product_id, quantity, purchase_price, subtotal, expiry_date)
         VALUES (?, ?, ?, ?, ?, ?)
       `, [
         purchaseId,
         item.product_id,
-        batchId,
         item.quantity,
         item.purchase_price,
-        subtotal
+        subtotal,
+        item.expiry_date
       ]);
+
+      // b. Update Product Stock and Master Details
+      if (item.expiry_date) {
+        db.runSync(`
+          UPDATE products 
+          SET 
+            total_stock = total_stock + ?, 
+            purchase_price = ?, 
+            expiry_date = ? 
+          WHERE id = ?
+        `, [item.quantity, item.purchase_price, item.expiry_date, item.product_id]);
+      } else {
+        db.runSync(`
+          UPDATE products 
+          SET 
+            total_stock = total_stock + ?, 
+            purchase_price = ? 
+          WHERE id = ?
+        `, [item.quantity, item.purchase_price, item.product_id]);
+      }
     }
   });
 
@@ -70,13 +73,4 @@ export const createPurchase = (
 export const getPurchases = (): Purchase[] => {
   const db = getDB();
   return db.getAllSync(`SELECT * FROM purchases ORDER BY purchase_date DESC`);
-};
-
-export const getBatchesForProduct = (productId: number): Batch[] => {
-  const db = getDB();
-  return db.getAllSync(`
-    SELECT * FROM batches 
-    WHERE product_id = ? AND remaining_quantity > 0
-    ORDER BY purchase_date ASC
-  `, [productId]);
 };
