@@ -100,18 +100,22 @@ export const importDatabase = async () => {
                 const tempDbName = `temp_import_${Date.now()}.db`;
                 const tempDbPath = currentPath.replace('vetstore.db', tempDbName);
                 
-                // 2. Copy the picked file directly to the temporary database path
-                // We do NOT use openDatabaseSync to create the file first, because
-                // expo-sqlite locks the file and makes it un-writable for FileSystem.copyAsync
+                // 2. Read from the source URI as Base64 and write to the temp path
+                // We use Base64 read/write instead of copyAsync because copyAsync 
+                // often fails with "isn't writable" when crossing volumes from external content:// URIs
                 try {
-                  console.log(`Copying from ${sourceFileUri} to ${tempDbPath}`);
-                  await LegacyFileSystem.copyAsync({
-                    from: sourceFileUri,
-                    to: tempDbPath
+                  console.log(`Reading from ${sourceFileUri}`);
+                  const base64Data = await LegacyFileSystem.readAsStringAsync(sourceFileUri, {
+                    encoding: LegacyFileSystem.EncodingType.Base64,
+                  });
+                  
+                  console.log(`Writing to ${tempDbPath}`);
+                  await LegacyFileSystem.writeAsStringAsync(tempDbPath, base64Data, {
+                    encoding: LegacyFileSystem.EncodingType.Base64,
                   });
                 } catch (copyError: any) {
-                  console.error('Error copying file:', copyError);
-                  Alert.alert('Error', `Failed to read the backup file.\nDetails: ${copyError?.message || copyError}`);
+                  console.error('Error copying file via base64:', copyError);
+                  Alert.alert('Error', `Failed to read or write the backup file.\nDetails: ${copyError?.message || copyError}`);
                   resolve(false);
                   return;
                 }
@@ -164,9 +168,13 @@ export const importDatabase = async () => {
                      await LegacyFileSystem.deleteAsync(currentPath);
                   }
                   
-                  await LegacyFileSystem.copyAsync({
-                    from: tempDbPath,
-                    to: currentPath
+                  // Use Base64 read/write instead of copyAsync to guarantee safety
+                  console.log('Writing final database to active path...');
+                  const finalDbBase64 = await LegacyFileSystem.readAsStringAsync(tempDbPath, {
+                    encoding: LegacyFileSystem.EncodingType.Base64,
+                  });
+                  await LegacyFileSystem.writeAsStringAsync(currentPath, finalDbBase64, {
+                    encoding: LegacyFileSystem.EncodingType.Base64,
                   });
                 } catch (swapError: any) {
                   console.error('CRITICAL: Failed to swap database files:', swapError);
