@@ -93,24 +93,16 @@ export const importDatabase = async () => {
               try {
                 console.log('Import started for URI:', sourceFileUri);
                 
-                // 1. Open a temporary database to get a valid, writable path
+                // 1. Get the SQLite directory path dynamically from the active DB
+                const db = getDB();
+                const currentPath = db.databasePath;
+                // e.g. /data/data/com.app/files/SQLite/vetstore.db
                 const tempDbName = `temp_import_${Date.now()}.db`;
-                let tempDb: any = null;
-                try {
-                  // We require expo-sqlite directly to create a temp db
-                  const SQLite = require('expo-sqlite');
-                  tempDb = SQLite.openDatabaseSync(tempDbName);
-                } catch (e) {
-                  console.error('Failed to create temp DB:', e);
-                  Alert.alert('Error', 'Failed to prepare import environment.');
-                  resolve(false);
-                  return;
-                }
+                const tempDbPath = currentPath.replace('vetstore.db', tempDbName);
                 
-                const tempDbPath = tempDb.databasePath;
-                tempDb.closeSync(); // Close before overwriting
-                
-                // 2. Copy the picked file to the temporary database path
+                // 2. Copy the picked file directly to the temporary database path
+                // We do NOT use openDatabaseSync to create the file first, because
+                // expo-sqlite locks the file and makes it un-writable for FileSystem.copyAsync
                 try {
                   console.log(`Copying from ${sourceFileUri} to ${tempDbPath}`);
                   await LegacyFileSystem.copyAsync({
@@ -124,7 +116,8 @@ export const importDatabase = async () => {
                   return;
                 }
                 
-                // 3. Re-open the temporary database to validate it
+                // 3. Open the copied temporary database to validate it
+                let tempDb: any = null;
                 try {
                   const SQLite = require('expo-sqlite');
                   tempDb = SQLite.openDatabaseSync(tempDbName);
@@ -139,14 +132,14 @@ export const importDatabase = async () => {
                     try { tempDb.closeSync(); } catch(e){}
                   }
                   Alert.alert('Error', `The selected file is not a valid Vet Store backup.\nDetails: ${validationErr?.message || validationErr}`);
+                  // Cleanup invalid temp DB
+                  try { await LegacyFileSystem.deleteAsync(tempDbPath); } catch(e) {}
                   resolve(false);
                   return;
                 }
                 
                 // 4. Validation passed! Swap active database safely.
                 console.log('Validation passed. Swapping active database...');
-                const db = getDB();
-                const currentPath = db.databasePath;
                 
                 // Close active connection
                 resetDB();
@@ -165,6 +158,12 @@ export const importDatabase = async () => {
                 
                 // Replace the active DB with the validated temp DB
                 try {
+                  // We delete the old file first to avoid overwrite permission issues
+                  const dbInfo = await LegacyFileSystem.getInfoAsync(currentPath);
+                  if (dbInfo.exists) {
+                     await LegacyFileSystem.deleteAsync(currentPath);
+                  }
+                  
                   await LegacyFileSystem.copyAsync({
                     from: tempDbPath,
                     to: currentPath
