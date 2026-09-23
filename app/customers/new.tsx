@@ -31,14 +31,14 @@ export default function NewCustomer() {
     <ScrollView className="flex-1 bg-white p-4">
       <Text className="text-sm text-gray-500 font-bold mb-1 uppercase">Name *</Text>
       <TextInput
-        className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base"
+        className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base text-gray-900"
         value={form.name}
         onChangeText={(t) => setForm({ ...form, name: t })}
       />
 
       <Text className="text-sm text-gray-500 font-bold mb-1 uppercase">Phone</Text>
       <TextInput
-        className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base"
+        className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base text-gray-900"
         value={form.phone}
         onChangeText={(t) => setForm({ ...form, phone: t })}
         keyboardType="phone-pad"
@@ -46,7 +46,7 @@ export default function NewCustomer() {
 
       <Text className="text-sm text-gray-500 font-bold mb-1 uppercase">Address</Text>
       <TextInput
-        className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base"
+        className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base text-gray-900"
         value={form.address}
         onChangeText={(t) => setForm({ ...form, address: t })}
       />

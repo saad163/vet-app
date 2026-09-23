@@ -101,7 +101,7 @@ export default function EditProduct() {
 
       <Text className="text-sm text-gray-500 font-bold mb-1 uppercase">Product Name *</Text>
       <TextInput
-        className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base"
+        className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base text-gray-900"
         value={form.name}
         onChangeText={(t) => setForm({ ...form, name: t })}
       />
@@ -110,7 +110,7 @@ export default function EditProduct() {
         <View className="w-[48%]">
           <Text className="text-sm text-gray-500 font-bold mb-1 uppercase">Category</Text>
           <TextInput
-            className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base"
+            className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base text-gray-900"
             value={form.category}
             onChangeText={(t) => setForm({ ...form, category: t })}
           />
@@ -118,7 +118,7 @@ export default function EditProduct() {
         <View className="w-[48%]">
           <Text className="text-sm text-gray-500 font-bold mb-1 uppercase">Brand</Text>
           <TextInput
-            className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base"
+            className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base text-gray-900"
             value={form.brand}
             onChangeText={(t) => setForm({ ...form, brand: t })}
           />
@@ -129,7 +129,7 @@ export default function EditProduct() {
         <View className="w-[48%]">
           <Text className="text-sm text-gray-500 font-bold mb-1 uppercase">Min Sell Price *</Text>
           <TextInput
-            className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base"
+            className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base text-gray-900"
             value={form.min_selling_price}
             onChangeText={(t) => setForm({ ...form, min_selling_price: t })}
             keyboardType="numeric"
@@ -138,7 +138,7 @@ export default function EditProduct() {
         <View className="w-[48%]">
           <Text className="text-sm text-gray-500 font-bold mb-1 uppercase">Max Sell Price *</Text>
           <TextInput
-            className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base"
+            className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base text-gray-900"
             value={form.max_selling_price}
             onChangeText={(t) => setForm({ ...form, max_selling_price: t })}
             keyboardType="numeric"
@@ -150,7 +150,7 @@ export default function EditProduct() {
         <View className="w-[48%]">
           <Text className="text-sm text-gray-500 font-bold mb-1 uppercase">Unit</Text>
           <TextInput
-            className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base"
+            className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base text-gray-900"
             value={form.unit}
             onChangeText={(t) => setForm({ ...form, unit: t })}
           />
@@ -158,7 +158,7 @@ export default function EditProduct() {
         <View className="w-[48%]">
           <Text className="text-sm text-gray-500 font-bold mb-1 uppercase">Low Stock Alert</Text>
           <TextInput
-            className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base"
+            className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base text-gray-900"
             value={form.min_stock_alert}
             onChangeText={(t) => setForm({ ...form, min_stock_alert: t })}
             keyboardType="numeric"

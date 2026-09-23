@@ -1,10 +1,9 @@
-import { File, Paths } from 'expo-file-system';
 import * as LegacyFileSystem from 'expo-file-system/legacy';
 const { StorageAccessFramework } = LegacyFileSystem;
+import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import { Alert, Platform } from 'react-native';
-import * as SQLite from 'expo-sqlite';
 import { getDB, resetDB, initDatabase } from '../../database';
 
 const DB_NAME = 'vetstore.db';
@@ -80,7 +79,7 @@ export const importDatabase = async () => {
       return false;
     }
 
-    const sourceFile = new File(result.assets[0].uri);
+    const sourceFileUri = result.assets[0].uri;
 
     return new Promise<boolean>((resolve) => {
       Alert.alert(
@@ -92,21 +91,35 @@ export const importDatabase = async () => {
             text: 'Import',
             onPress: async () => {
               try {
-                // Read bytes from the imported file
-                const bytes = await sourceFile.bytes();
-
                 const db = getDB();
                 const currentPath = db.databasePath;
                 
                 // Sever the active database connection
                 resetDB();
 
-                // Safely destroy existing database and clear fragmented WAL/SHM temp files.
-                await SQLite.deleteDatabaseAsync(DB_NAME);
+                // Safely copy the imported file over the existing database
+                await LegacyFileSystem.copyAsync({
+                  from: sourceFileUri,
+                  to: currentPath
+                });
 
-                // Write pure backup bytes to the exact OS-approved internal sqlite path
-                const destFile = new File(currentPath);
-                destFile.write(bytes);
+                // Clear any residual WAL or SHM files which might cause corruption
+                const walPath = `${currentPath}-wal`;
+                const shmPath = `${currentPath}-shm`;
+                
+                try {
+                  const walInfo = await LegacyFileSystem.getInfoAsync(walPath);
+                  if (walInfo.exists) {
+                    await LegacyFileSystem.deleteAsync(walPath);
+                  }
+                  
+                  const shmInfo = await LegacyFileSystem.getInfoAsync(shmPath);
+                  if (shmInfo.exists) {
+                    await LegacyFileSystem.deleteAsync(shmPath);
+                  }
+                } catch (e) {
+                  console.log("No WAL/SHM temp files to clear.");
+                }
 
                 // Restart JS database connection & tables
                 initDatabase();

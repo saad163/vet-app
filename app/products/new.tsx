@@ -58,7 +58,7 @@ export default function NewProduct() {
     <ScrollView className="flex-1 bg-white p-4">
       <Text className="text-sm text-gray-500 font-bold mb-1 uppercase">Product Name *</Text>
       <TextInput
-        className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base"
+        className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base text-gray-900"
         value={form.name}
         onChangeText={(t) => setForm({ ...form, name: t })}
         placeholder="E.g. Paracetamol"
@@ -68,7 +68,7 @@ export default function NewProduct() {
         <View className="w-[48%]">
           <Text className="text-sm text-gray-500 font-bold mb-1 uppercase">Category</Text>
           <TextInput
-            className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base"
+            className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base text-gray-900"
             value={form.category}
             onChangeText={(t) => setForm({ ...form, category: t })}
             placeholder="Medicine"
@@ -77,7 +77,7 @@ export default function NewProduct() {
         <View className="w-[48%]">
           <Text className="text-sm text-gray-500 font-bold mb-1 uppercase">Brand</Text>
           <TextInput
-            className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base"
+            className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base text-gray-900"
             value={form.brand}
             onChangeText={(t) => setForm({ ...form, brand: t })}
             placeholder="ABC Vet"
@@ -89,7 +89,7 @@ export default function NewProduct() {
         <View className="w-[48%]">
           <Text className="text-sm text-gray-500 font-bold mb-1 uppercase">Min Sell Price *</Text>
           <TextInput
-            className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base"
+            className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base text-gray-900"
             value={form.min_selling_price}
             onChangeText={(t) => setForm({ ...form, min_selling_price: t })}
             keyboardType="numeric"
@@ -99,7 +99,7 @@ export default function NewProduct() {
         <View className="w-[48%]">
           <Text className="text-sm text-gray-500 font-bold mb-1 uppercase">Max Sell Price *</Text>
           <TextInput
-            className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base"
+            className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base text-gray-900"
             value={form.max_selling_price}
             onChangeText={(t) => setForm({ ...form, max_selling_price: t })}
             keyboardType="numeric"
@@ -112,7 +112,7 @@ export default function NewProduct() {
         <View className="w-[48%]">
           <Text className="text-sm text-gray-500 font-bold mb-1 uppercase">Unit</Text>
           <TextInput
-            className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base"
+            className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base text-gray-900"
             value={form.unit}
             onChangeText={(t) => setForm({ ...form, unit: t })}
             placeholder="bottle, pcs, ml"
@@ -121,7 +121,7 @@ export default function NewProduct() {
         <View className="w-[48%]">
           <Text className="text-sm text-gray-500 font-bold mb-1 uppercase">Low Stock Alert At</Text>
           <TextInput
-            className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base"
+            className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base text-gray-900"
             value={form.min_stock_alert}
             onChangeText={(t) => setForm({ ...form, min_stock_alert: t })}
             keyboardType="numeric"
@@ -133,7 +133,7 @@ export default function NewProduct() {
         <View className="w-[48%]">
           <Text className="text-sm text-gray-500 font-bold mb-1 uppercase">Purchase Price *</Text>
           <TextInput
-            className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base"
+            className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base text-gray-900"
             value={form.purchase_price}
             onChangeText={(t) => setForm({ ...form, purchase_price: t })}
             keyboardType="numeric"
@@ -143,7 +143,7 @@ export default function NewProduct() {
         <View className="w-[48%]">
           <Text className="text-sm text-gray-500 font-bold mb-1 uppercase">Initial Stock *</Text>
           <TextInput
-            className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base"
+            className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base text-gray-900"
             value={form.initial_quantity}
             onChangeText={(t) => setForm({ ...form, initial_quantity: t })}
             keyboardType="numeric"
@@ -154,7 +154,7 @@ export default function NewProduct() {
 
       <Text className="text-sm text-gray-500 font-bold mb-1 uppercase">Initial Expiry Date (Optional)</Text>
       <TextInput
-        className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base"
+        className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-base text-gray-900"
         value={form.expiry_date}
         onChangeText={(t) => setForm({ ...form, expiry_date: t })}
         placeholder="YYYY-MM-DD"

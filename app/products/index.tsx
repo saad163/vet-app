@@ -29,8 +29,9 @@ export default function ProductsList() {
       <View className="flex-row items-center mb-4 bg-white rounded-xl p-2 px-4 shadow-sm">
         <Search size={20} color="#6b7280" />
         <TextInput
-          className="flex-1 ml-2 text-base h-10"
+          className="flex-1 ml-2 text-base h-10 text-gray-900"
           placeholder="Search products..."
+          placeholderTextColor="#9ca3af"
           value={searchQuery}
           onChangeText={setSearchQuery}
         />

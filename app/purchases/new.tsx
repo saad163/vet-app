@@ -56,17 +56,19 @@ export default function NewPurchase() {
         <View className="bg-gray-50 p-4 rounded-xl mb-6">
           <Text className="text-sm text-gray-500 font-bold mb-1 uppercase">Supplier</Text>
           <TextInput
-            className="bg-white border border-gray-200 rounded-lg p-3 mb-4 text-base"
+            className="bg-white border border-gray-200 rounded-lg p-3 mb-4 text-base text-gray-900"
             value={supplier}
             onChangeText={setSupplier}
             placeholder="Supplier Name"
+            placeholderTextColor="#9ca3af"
           />
           <Text className="text-sm text-gray-500 font-bold mb-1 uppercase">Notes</Text>
           <TextInput
-            className="bg-white border border-gray-200 rounded-lg p-3 text-base"
+            className="bg-white border border-gray-200 rounded-lg p-3 text-base text-gray-900"
             value={notes}
             onChangeText={setNotes}
             placeholder="Optional notes"
+            placeholderTextColor="#9ca3af"
           />
         </View>
 
@@ -99,8 +101,9 @@ export default function NewPurchase() {
 
           <View className="flex-row justify-between">
             <TextInput
-              className="bg-white border border-gray-200 rounded-lg p-3 mb-4 w-[100%]"
+              className="bg-white border border-gray-200 rounded-lg p-3 mb-4 w-[100%] text-gray-900"
               placeholder="Expiry (YYYY-MM-DD)"
+              placeholderTextColor="#9ca3af"
               value={currentItem.expiry_date || ""}
               onChangeText={(t) => setCurrentItem({...currentItem, expiry_date: t})}
             />
@@ -108,15 +111,17 @@ export default function NewPurchase() {
 
           <View className="flex-row justify-between">
             <TextInput
-              className="bg-white border border-gray-200 rounded-lg p-3 w-[48%]"
+              className="bg-white border border-gray-200 rounded-lg p-3 w-[48%] text-gray-900"
               placeholder="Quantity *"
+              placeholderTextColor="#9ca3af"
               keyboardType="numeric"
               value={currentItem.quantity?.toString() || ""}
               onChangeText={(t) => setCurrentItem({...currentItem, quantity: parseInt(t) || 0})}
             />
             <TextInput
-              className="bg-white border border-gray-200 rounded-lg p-3 w-[48%]"
+              className="bg-white border border-gray-200 rounded-lg p-3 w-[48%] text-gray-900"
               placeholder="Unit Price (Rs) *"
+              placeholderTextColor="#9ca3af"
               keyboardType="numeric"
               value={currentItem.purchase_price?.toString() || ""}
               onChangeText={(t) => setCurrentItem({...currentItem, purchase_price: parseFloat(t) || 0})}

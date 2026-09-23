@@ -75,10 +75,11 @@ export default function NewSale() {
         <View className="bg-gray-50 p-4 rounded-xl mb-6">
           <Text className="text-sm text-gray-500 font-bold mb-1 uppercase">Notes</Text>
           <TextInput
-            className="bg-white border border-gray-200 rounded-lg p-3 text-base"
+            className="bg-white border border-gray-200 rounded-lg p-3 text-base text-gray-900"
             value={notes}
             onChangeText={setNotes}
             placeholder="Optional notes"
+            placeholderTextColor="#9ca3af"
           />
         </View>
 
@@ -117,15 +118,17 @@ export default function NewSale() {
 
           <View className="flex-row justify-between">
             <TextInput
-              className="bg-white border border-gray-200 rounded-lg p-3 w-[48%]"
+              className="bg-white border border-gray-200 rounded-lg p-3 w-[48%] text-gray-900"
               placeholder="Quantity *"
+              placeholderTextColor="#9ca3af"
               keyboardType="numeric"
               value={currentItem.quantity?.toString() || ""}
               onChangeText={(t) => setCurrentItem({...currentItem, quantity: parseInt(t) || 0})}
             />
             <TextInput
-              className="bg-white border border-gray-200 rounded-lg p-3 w-[48%]"
+              className="bg-white border border-gray-200 rounded-lg p-3 w-[48%] text-gray-900"
               placeholder="Selling Price (Rs) *"
+              placeholderTextColor="#9ca3af"
               keyboardType="numeric"
               value={currentItem.selling_price?.toString() || ""}
               onChangeText={(t) => setCurrentItem({...currentItem, selling_price: parseFloat(t) || 0})}
@@ -169,8 +172,9 @@ export default function NewSale() {
           <View className="flex-row items-center mb-4 bg-gray-100 rounded-xl p-2 px-4">
             <Search size={20} color="#6b7280" />
             <TextInput
-              className="flex-1 ml-2 text-base h-10"
+              className="flex-1 ml-2 text-base h-10 text-gray-900"
               placeholder="Search products..."
+              placeholderTextColor="#9ca3af"
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
