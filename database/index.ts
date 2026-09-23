@@ -22,8 +22,13 @@ export const resetDB = () => {
 export const initDatabase = () => {
   const db = getDB();
 
+  // Set WAL mode for better concurrency and crash recovery.
+  // synchronous=NORMAL is the recommended setting for WAL mode:
+  // it ensures data reaches the OS before confirming a write, without
+  // requiring a full fsync on every transaction (which would be FULL mode).
   db.execSync(`
     PRAGMA journal_mode = WAL;
+    PRAGMA synchronous = NORMAL;
   `);
 
   // --- MIGRATION: Remove Batch System ---
@@ -269,4 +274,16 @@ export const initDatabase = () => {
       FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE RESTRICT
     );
   `);
+
+  // Force a WAL checkpoint on every startup.
+  // This flushes all WAL-file data into the main .db file so that even if
+  // Android kills the process after this point, all previously committed
+  // data is safely stored in the main database file and not just the WAL file.
+  // Without this, a process kill between launches can cause the WAL file to
+  // be orphaned, making the app appear empty on the next launch.
+  try {
+    db.execSync(`PRAGMA wal_checkpoint(TRUNCATE);`);
+  } catch (e) {
+    console.warn("WAL checkpoint failed (non-critical):", e);
+  }
 };
