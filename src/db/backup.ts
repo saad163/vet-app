@@ -93,16 +93,14 @@ export const importDatabase = async () => {
               try {
                 console.log('Import started for URI:', sourceFileUri);
                 
-                // 1. Get the SQLite directory path dynamically from the active DB
-                const db = getDB();
-                const currentPath = db.databasePath;
-                // e.g. /data/data/com.app/files/SQLite/vetstore.db
+                // 1. Define a temporary database path in the universally writable documentDirectory
                 const tempDbName = `temp_import_${Date.now()}.db`;
-                const tempDbPath = currentPath.replace('vetstore.db', tempDbName);
+                // ensure documentDirectory exists and ends with slash
+                const tempDbDir = LegacyFileSystem.documentDirectory || ''; 
+                const tempDbPath = `${tempDbDir}${tempDbName}`;
                 
                 // 2. Read from the source URI as Base64 and write to the temp path
-                // We use Base64 read/write instead of copyAsync because copyAsync 
-                // often fails with "isn't writable" when crossing volumes from external content:// URIs
+                // This bypasses any Android OS content:// file copy restrictions
                 try {
                   console.log(`Reading from ${sourceFileUri}`);
                   const base64Data = await LegacyFileSystem.readAsStringAsync(sourceFileUri, {
@@ -113,6 +111,12 @@ export const importDatabase = async () => {
                   await LegacyFileSystem.writeAsStringAsync(tempDbPath, base64Data, {
                     encoding: LegacyFileSystem.EncodingType.Base64,
                   });
+                  
+                  // Verify temp file size
+                  const fileInfo = await LegacyFileSystem.getInfoAsync(tempDbPath);
+                  if (!fileInfo.exists || fileInfo.size === 0) {
+                    throw new Error("Imported file is empty or missing.");
+                  }
                 } catch (copyError: any) {
                   console.error('Error copying file via base64:', copyError);
                   Alert.alert('Error', `Failed to read or write the backup file.\nDetails: ${copyError?.message || copyError}`);
@@ -124,10 +128,12 @@ export const importDatabase = async () => {
                 let tempDb: any = null;
                 try {
                   const SQLite = require('expo-sqlite');
-                  tempDb = SQLite.openDatabaseSync(tempDbName);
+                  // openDatabaseSync supports (name, options, directory)
+                  tempDb = SQLite.openDatabaseSync(tempDbName, undefined, tempDbDir);
+                  
                   const check = tempDb.getFirstSync(`SELECT count(*) as count FROM sqlite_master WHERE type="table" AND name IN ('sales', 'returns', 'products')`);
                   if (!check || check.count < 3) {
-                    throw new Error("Missing required tables.");
+                    throw new Error("Missing required tables. Not a valid Vet Store backup.");
                   }
                   tempDb.closeSync();
                 } catch (validationErr: any) {
@@ -144,8 +150,10 @@ export const importDatabase = async () => {
                 
                 // 4. Validation passed! Swap active database safely.
                 console.log('Validation passed. Swapping active database...');
+                const db = getDB();
+                const currentPath = db.databasePath;
                 
-                // Close active connection
+                // Close active connection completely
                 resetDB();
                 
                 // Clear old WAL/SHM to prevent corruption of the new DB
@@ -162,13 +170,10 @@ export const importDatabase = async () => {
                 
                 // Replace the active DB with the validated temp DB
                 try {
-                  // We delete the old file first to avoid overwrite permission issues
-                  const dbInfo = await LegacyFileSystem.getInfoAsync(currentPath);
-                  if (dbInfo.exists) {
-                     await LegacyFileSystem.deleteAsync(currentPath);
-                  }
-                  
-                  // Use Base64 read/write instead of copyAsync to guarantee safety
+                  // We MUST NOT delete the active currentPath first! 
+                  // If we delete it, creating a new file in the /SQLite/ directory will fail 
+                  // with "isn't writable" due to Expo SQLite sandbox restrictions.
+                  // Instead, we overwrite the existing file's bytes.
                   console.log('Writing final database to active path...');
                   const finalDbBase64 = await LegacyFileSystem.readAsStringAsync(tempDbPath, {
                     encoding: LegacyFileSystem.EncodingType.Base64,
