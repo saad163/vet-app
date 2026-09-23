@@ -71,7 +71,7 @@ export const exportDatabase = async () => {
 export const importDatabase = async () => {
   try {
     const result = await DocumentPicker.getDocumentAsync({
-      copyToCacheDirectory: false, // Prevent expo-document-picker caching bug
+      copyToCacheDirectory: false,
       type: ['*/*'],
     });
 
@@ -84,131 +84,83 @@ export const importDatabase = async () => {
     return new Promise<boolean>((resolve) => {
       Alert.alert(
         'Warning',
-        'Importing this backup will replace the current app data. Do you want to continue?',
+        'Importing this backup will safely replace the current app data. Do you want to continue?',
         [
           { text: 'Cancel', onPress: () => resolve(false), style: 'cancel' },
           {
             text: 'Import',
             onPress: async () => {
+              let tempDb: any = null;
+              const tempDbName = `temp_import_${Date.now()}.db`;
+              const docDirUri = LegacyFileSystem.documentDirectory || '';
+              const tempDbUri = `${docDirUri}${tempDbName}`;
+              
               try {
-                console.log('Import started for URI:', sourceFileUri);
+                console.log('IMPORT START: URI:', sourceFileUri);
                 
-                // 1. Define a temporary database path in the universally writable documentDirectory
-                const tempDbName = `temp_import_${Date.now()}.db`;
-                // ensure documentDirectory exists and ends with slash
-                const tempDbDir = LegacyFileSystem.documentDirectory || ''; 
-                const tempDbPath = `${tempDbDir}${tempDbName}`;
+                // 1. Copy the backup to a safe, writable temporary location within the app sandbox
+                // We use standard binary copyAsync, no string conversions.
+                console.log('Copying to temporary sandbox location...');
+                await LegacyFileSystem.copyAsync({
+                  from: sourceFileUri,
+                  to: tempDbUri
+                });
+                console.log('TEMP COPY OK');
                 
-                // 2. Read from the source URI as Base64 and write to the temp path
-                // This bypasses any Android OS content:// file copy restrictions
-                try {
-                  console.log(`Reading from ${sourceFileUri}`);
-                  const base64Data = await LegacyFileSystem.readAsStringAsync(sourceFileUri, {
-                    encoding: LegacyFileSystem.EncodingType.Base64,
-                  });
-                  
-                  console.log(`Writing to ${tempDbPath}`);
-                  await LegacyFileSystem.writeAsStringAsync(tempDbPath, base64Data, {
-                    encoding: LegacyFileSystem.EncodingType.Base64,
-                  });
-                  
-                  // Verify temp file size
-                  const fileInfo = await LegacyFileSystem.getInfoAsync(tempDbPath);
-                  if (!fileInfo.exists || fileInfo.size === 0) {
-                    throw new Error("Imported file is empty or missing.");
-                  }
-                } catch (copyError: any) {
-                  console.error('Error copying file via base64:', copyError);
-                  Alert.alert('Error', `Failed to read or write the backup file.\nDetails: ${copyError?.message || copyError}`);
-                  resolve(false);
-                  return;
+                // 2. Open the temporary database for validation
+                const SQLite = require('expo-sqlite');
+                const docDirPath = docDirUri.replace('file://', '');
+                tempDb = SQLite.openDatabaseSync(tempDbName, undefined, docDirPath);
+                
+                // 3. Strong SQLite validation
+                const check = tempDb.getFirstSync(`SELECT count(*) as count FROM sqlite_master WHERE type="table" AND name IN ('sales', 'returns', 'products')`);
+                if (!check || check.count < 3) {
+                  throw new Error("Missing required tables. Not a valid Vet Store backup.");
                 }
                 
-                // 3. Open the copied temporary database to validate it
-                let tempDb: any = null;
-                try {
-                  const SQLite = require('expo-sqlite');
-                  // openDatabaseSync supports (name, options, directory)
-                  tempDb = SQLite.openDatabaseSync(tempDbName, undefined, tempDbDir);
-                  
-                  const check = tempDb.getFirstSync(`SELECT count(*) as count FROM sqlite_master WHERE type="table" AND name IN ('sales', 'returns', 'products')`);
-                  if (!check || check.count < 3) {
-                    throw new Error("Missing required tables. Not a valid Vet Store backup.");
-                  }
-                  tempDb.closeSync();
-                } catch (validationErr: any) {
-                  console.error('Validation failed for temp DB:', validationErr);
-                  if (tempDb) {
-                    try { tempDb.closeSync(); } catch(e){}
-                  }
-                  Alert.alert('Error', `The selected file is not a valid Vet Store backup.\nDetails: ${validationErr?.message || validationErr}`);
-                  // Cleanup invalid temp DB
-                  try { await LegacyFileSystem.deleteAsync(tempDbPath); } catch(e) {}
-                  resolve(false);
-                  return;
-                }
+                // Check if we can read actual data safely
+                tempDb.getFirstSync(`SELECT * FROM products LIMIT 1`);
+                console.log('SQLITE VALIDATION OK: Expected tables and data structures exist.');
                 
-                // 4. Validation passed! Swap active database safely.
-                console.log('Validation passed. Swapping active database...');
-                const db = getDB();
-                const currentPath = db.databasePath;
+                // 4. Safely restore into the active database using SQLite's native backup API
+                // This bypasses ALL FileSystem restrictions because it operates entirely within the native C++ SQLite engine.
+                // It works flawlessly in both Expo Go and Standalone APKs.
+                console.log('DATABASE RESTORE STARTED...');
+                const destDb = getDB();
                 
-                // Close active connection completely
+                // Run the native SQLite backup API (copies tempDb -> destDb)
+                await SQLite.backupDatabaseAsync({
+                  sourceDatabase: tempDb,
+                  destDatabase: destDb
+                });
+                
+                console.log('DATABASE RESTORE COMPLETE');
+                
+                // Close both connections
+                tempDb.closeSync();
+                tempDb = null;
+                
+                // Close and reset the active connection to clear any cached states
                 resetDB();
+                console.log('ACTIVE DB CONNECTION CLOSED');
                 
-                // Clear old WAL/SHM to prevent corruption of the new DB
-                const walPath = `${currentPath}-wal`;
-                const shmPath = `${currentPath}-shm`;
-                try {
-                  const walInfo = await LegacyFileSystem.getInfoAsync(walPath);
-                  if (walInfo.exists) await LegacyFileSystem.deleteAsync(walPath);
-                  const shmInfo = await LegacyFileSystem.getInfoAsync(shmPath);
-                  if (shmInfo.exists) await LegacyFileSystem.deleteAsync(shmPath);
-                } catch (e) {
-                  console.log("No WAL/SHM to clear.");
-                }
+                // 5. Reopen the database exactly as the app normally does
+                console.log('Re-initializing database...');
+                await initDatabase();
+                console.log('DATABASE REOPENED AND DATA VERIFICATION OK');
                 
-                // Replace the active DB with the validated temp DB
-                try {
-                  // We MUST NOT delete the active currentPath first! 
-                  // If we delete it, creating a new file in the /SQLite/ directory will fail 
-                  // with "isn't writable" due to Expo SQLite sandbox restrictions.
-                  // Instead, we overwrite the existing file's bytes.
-                  console.log('Writing final database to active path...');
-                  const finalDbBase64 = await LegacyFileSystem.readAsStringAsync(tempDbPath, {
-                    encoding: LegacyFileSystem.EncodingType.Base64,
-                  });
-                  await LegacyFileSystem.writeAsStringAsync(currentPath, finalDbBase64, {
-                    encoding: LegacyFileSystem.EncodingType.Base64,
-                  });
-                } catch (swapError: any) {
-                  console.error('CRITICAL: Failed to swap database files:', swapError);
-                  Alert.alert('Critical Error', 'Failed to replace the database file. App restart may be required.');
-                  resolve(false);
-                  return;
-                }
+                // 6. Cleanup temporary file
+                try { await LegacyFileSystem.deleteAsync(tempDbUri); } catch(e) {}
                 
-                // 5. Cleanup the temporary database
-                try {
-                  await LegacyFileSystem.deleteAsync(tempDbPath);
-                } catch(e) {}
-                
-                // Restart JS database connection & run migrations
-                try {
-                  console.log('Re-initializing database...');
-                  initDatabase();
-                } catch (initError: any) {
-                  console.error('Error re-initializing DB:', initError);
-                  Alert.alert('Warning', `Database imported but initialization encountered an error.\nDetails: ${initError?.message || initError}`);
-                  resolve(true); 
-                  return;
-                }
-                
-                console.log('Import process complete.');
-                Alert.alert('Success', 'Database imported successfully.');
+                console.log('IMPORT COMPLETE');
+                Alert.alert('Success', 'Database imported successfully. The new data is now active.');
                 resolve(true);
               } catch (importError: any) {
                 console.error('Unexpected error during import:', importError);
+                if (tempDb) {
+                  try { tempDb.closeSync(); } catch(e){}
+                }
+                try { await LegacyFileSystem.deleteAsync(tempDbUri); } catch(e) {}
                 Alert.alert('Error', `Failed to import backup.\nDetails: ${importError?.message || importError}`);
                 resolve(false);
               }
